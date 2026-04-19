@@ -141,7 +141,7 @@ def _fetch_rba_csv(url: str, series_id: str) -> pd.Series:
             f"(have {list(df.columns)[:6]}...)"
         )
     date_col = df.columns[0]
-    df[date_col] = pd.to_datetime(df[date_col], errors="coerce", dayfirst=True)
+    df[date_col] = pd.to_datetime(df[date_col], errors="coerce", format="%d-%b-%Y")
     df = df.dropna(subset=[date_col]).set_index(date_col).sort_index()
     s = pd.to_numeric(df[series_id], errors="coerce").dropna()
     s.index = s.index.date
@@ -205,6 +205,13 @@ def series_at(s: pd.Series, d: date) -> float:
     earlier = s[[i for i in s.index if i <= d]]
     if earlier.empty:
         return float(s.iloc[0])
+    if d > s.index[-1]:
+        gap = (d - s.index[-1]).days
+        print(
+            f"warning: series_at({d}) extrapolates past last observation "
+            f"{s.index[-1]} by {gap} day(s); using stale value",
+            file=sys.stderr,
+        )
     return float(earlier.iloc[-1])
 
 
