@@ -108,10 +108,10 @@ RBA_F2_URL = "https://www.rba.gov.au/statistics/tables/csv/f2-data.csv"
 FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}"
 
 AU_BOND_SERIES = {
-    2: "FCMYGBAG2",
-    3: "FCMYGBAG3",
-    5: "FCMYGBAG5",
-    10: "FCMYGBAG10",
+    2: "FCMYGBAG2D",
+    3: "FCMYGBAG3D",
+    5: "FCMYGBAG5D",
+    10: "FCMYGBAG10D",
 }
 US_BOND_SERIES = {
     1: "DGS1",
