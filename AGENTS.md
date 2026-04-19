@@ -102,9 +102,12 @@ where `reinvest` is checked. Don't push this logic out to `main`.
 Watch for:
 - `units_held <= 0` at a dividend event (e.g. dividend before first buy
   when date ranges overlap) — already handled, preserve the guard.
-- Same-day buy + dividend: the event sort puts buys first, so units
-  bought that day do receive the dividend. If you change this, document
-  it — it affects the output.
+- Same-day buy + dividend: the event sort puts dividends first, matching
+  ex-div convention — a purchase on the ex-div date does NOT receive that
+  distribution. Buy events are keyed by the *trade date* returned by
+  `price_on_or_after`, not the user-supplied purchase date, so a purchase
+  requested on a non-trading day can legitimately land on (or after) a
+  later dividend.
 
 ## Yahoo data gotchas
 

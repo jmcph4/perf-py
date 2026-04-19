@@ -87,8 +87,20 @@ def xnpv(rate: float, cashflows: list[tuple[date, float]]) -> float:
 
 
 def xirr(cashflows: list[tuple[date, float]]) -> float:
+    if not cashflows:
+        raise ValueError("xirr: no cashflows")
     cashflows = sorted(cashflows, key=lambda x: x[0])
-    return brentq(lambda r: xnpv(r, cashflows), -0.9999, 100.0, maxiter=500)
+    if cashflows[0][0] == cashflows[-1][0]:
+        raise ValueError("xirr: all cashflows share a single date; return is undefined")
+    lo, hi = -0.9999, 100.0
+    f_lo, f_hi = xnpv(lo, cashflows), xnpv(hi, cashflows)
+    if f_lo * f_hi > 0:
+        raise ValueError(
+            f"xirr: NPV does not change sign on [{lo}, {hi}] "
+            f"(NPV(lo)={f_lo:.4g}, NPV(hi)={f_hi:.4g}); "
+            "cashflows likely lack both an inflow and an outflow"
+        )
+    return brentq(lambda r: xnpv(r, cashflows), lo, hi, maxiter=500)
 
 
 RBA_G1_URL = "https://www.rba.gov.au/statistics/tables/csv/g1-data.csv"
@@ -231,29 +243,34 @@ def build_ticker_cashflows(
                 return i, float(prices[i])
         raise RuntimeError(f"no price on or after {d} for {ticker}")
 
-    events: list[tuple[date, str, float]] = []
+    events: list[tuple[date, str, float, float]] = []
     for p in purchases:
-        events.append((p.on, "buy", p.units))
+        trade_date, px = price_on_or_after(p.on)
+        events.append((trade_date, "buy", p.units, px))
     for d, v in dividends[dividends > 0].items():
-        events.append((d, "div", float(v)))
-    events.sort(key=lambda x: (x[0], 0 if x[1] == "buy" else 1))
+        events.append((d, "div", float(v), 0.0))
+    events.sort(key=lambda x: (x[0], 0 if x[1] == "div" else 1))
 
     cashflows: list[tuple[date, float]] = []
     units_held = 0.0
     distributions = 0.0
     reinvested_units = 0.0
-    for d, kind, v in events:
+    for d, kind, amount, px in events:
         if kind == "buy":
-            trade_date, px = price_on_or_after(d)
-            cashflows.append((trade_date, -v * px))
-            units_held += v
+            cashflows.append((d, -amount * px))
+            units_held += amount
         else:
             if units_held <= 0:
                 continue
-            cash = units_held * v
+            cash = units_held * amount
             distributions += cash
             if reinvest:
-                drp_date, drp_px = price_on_or_after(d)
+                _, drp_px = price_on_or_after(d)
+                if drp_px <= 0:
+                    raise RuntimeError(
+                        f"{ticker}: cannot reinvest dividend on {d}; "
+                        f"ex-date close is {drp_px}"
+                    )
                 new_units = cash / drp_px
                 units_held += new_units
                 reinvested_units += new_units
@@ -285,6 +302,15 @@ def deflate(
     numeraire: pd.Series,
     target: date,
 ) -> list[tuple[date, float]]:
+    if numeraire.empty:
+        raise RuntimeError("deflate: numéraire series is empty")
+    first = numeraire.index[0]
+    early = [d for d, _ in cashflows if d < first]
+    if early:
+        raise RuntimeError(
+            f"deflate: {len(early)} cashflow(s) predate deflator series start "
+            f"{first} (earliest: {min(early)}); cannot compute adjustment"
+        )
     target_val = series_at(numeraire, target)
     return [(d, cf * target_val / series_at(numeraire, d)) for d, cf in cashflows]
 
