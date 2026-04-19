@@ -36,6 +36,11 @@ class Purchase:
     units: float
 
 
+def _normalize_ticker(t: str) -> str:
+    t = t.strip().upper()
+    return t if "." in t else f"{t}.AX"
+
+
 def _parse_purchase_fields(
     fields: list[str], default_ticker: str | None, origin: str
 ) -> Purchase:
@@ -52,7 +57,7 @@ def _parse_purchase_fields(
             f"{origin}: expected 2 or 3 fields (TICKER,DATE,UNITS), got {fields!r}"
         )
     return Purchase(
-        ticker=ticker.strip(),
+        ticker=_normalize_ticker(ticker),
         on=datetime.strptime(date_s.strip(), "%Y-%m-%d").date(),
         units=float(units_s.strip()),
     )

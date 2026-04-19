@@ -26,6 +26,7 @@ No tests, no CI. Keep it that way unless the user asks.
 
 1. **Purchase parsing** (`Purchase`, `parse_purchase_arg`, `load_purchases_csv`).
    Accepts `TICKER:DATE:UNITS` or `DATE:UNITS` (with `--ticker` fallback).
+   `_normalize_ticker` uppercases and appends `.AX` to suffixless tickers.
 2. **XIRR primitives** (`xnpv`, `xirr`). Uses `scipy.optimize.brentq`
    rooting on the NPV equation, actual/365 daycount.
 3. **Data fetchers**:

@@ -22,7 +22,9 @@ You supply only **dates and unit counts**. Prices, distributions, CPI, and
 bond yields are all fetched from public sources.
 
 A purchase is `TICKER:DATE:UNITS`, e.g. `VGS.AX:2021-03-15:120`. If the
-ticker is omitted, `--ticker` is used (default `VGS.AX`).
+ticker is omitted, `--ticker` is used (default `VGS.AX`). Bare tickers
+with no exchange suffix (e.g. `VGS`) are assumed ASX-listed and
+normalised to `.AX`; supply an explicit suffix to override.
 
 Either repeat `--purchase`, or pass a CSV via `--purchases`:
 
