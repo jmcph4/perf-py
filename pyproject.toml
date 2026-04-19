@@ -1,0 +1,11 @@
+[project]
+name = "perf-py"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=3.0.2",
+    "scipy>=1.17.1",
+    "yfinance>=1.3.0",
+]

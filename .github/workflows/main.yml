@@ -1,0 +1,43 @@
+name: Python
+
+on: [push]
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: astral-sh/setup-uv@v4
+
+            - name: Sync dependencies
+              run: uv sync --locked
+
+    lint:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: astral-sh/setup-uv@v4
+
+            - name: Run Ruff format check
+              run: uvx ruff format --check .
+
+            - name: Run Ruff lint
+              run: uvx ruff check .
+
+            - name: Check imports
+              run: uv run --frozen python -c "import perf"
+
+    audit:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: astral-sh/setup-uv@v4
+
+            - name: Export requirements
+              run: uv export --format requirements-txt --no-hashes --no-dev -o requirements.txt
+
+            - name: Run dependency security audit
+              run: uvx pip-audit -r requirements.txt
