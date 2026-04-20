@@ -62,9 +62,13 @@ No tests, no CI. Keep it that way unless the user asks.
 - **Deflation is a scalar transform per cashflow.** Do not re-implement
   it as a rate-subtraction hack; the numéraire-ratio form is correct for
   both CPI and risk-free and is what the `deflate` call sites expect.
-- **All tickers are assumed AUD.** The docstring and README say so. If
-  the user asks for FX support, this assumption has to be lifted
-  deliberately — don't silently introduce a currency column.
+- **All tickers are assumed AUD.** The docstring and README say so. The
+  one exception is `--risk-free us`, which converts the portfolio's AUD
+  cashflows to USD via `fetch_aud_usd_fx` before deflating by the US
+  Treasury index — the cashflows themselves are still built in AUD. If
+  the user asks for broader FX support (non-ASX tickers, AUD-hedged USD
+  rates, etc.), lift the assumption deliberately rather than silently
+  introducing a currency column.
 - **No I/O outside the fetchers and `print`.** Don't write files, don't
   cache to disk, don't log. The script is meant to be stateless.
 

@@ -116,7 +116,11 @@ US tenors: 1, 2, 3, 5, 7, 10, 20, 30 (FRED series `DGS{tenor}`).
 
 ## Caveats
 
-- All tickers are assumed AUD-denominated (ASX-listed). No FX conversion.
+- All tickers are assumed AUD-denominated (ASX-listed). With `--risk-free us`,
+  cashflows are converted to USD via daily AUD/USD spot (Yahoo Finance
+  `AUDUSD=X`) before computing the excess return, so the reported excess
+  is a USD figure and an additional USD nominal return is shown. All other
+  modes stay entirely in AUD.
 - Yahoo's distribution history for ASX ETFs is occasionally incomplete
   or mis-dated (especially the EOFY top-up declared in July). Sanity-check
   `Total distributions` against the issuer's published history before

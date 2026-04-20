@@ -7,9 +7,11 @@ CPI from the RBA (producing a real return) or a sovereign bond yield —
 Australian govt bonds (RBA Table F2) or US Treasuries (FRED DGS series) —
 producing an excess return over that risk-free rate.
 
-Every ticker is assumed to be ASX-listed and quoted in AUD, so no FX
-conversion is performed. Supplying a foreign listing will mix currencies
-and the output will be meaningless.
+Tickers are assumed AUD-denominated (ASX-listed). With `--risk-free us`,
+cashflows are converted to USD via daily AUD/USD spot from Yahoo Finance
+before the deflator is applied, so the reported excess return is a USD
+figure. All other modes operate entirely in AUD. Supplying a non-AUD
+listing will mix currencies and the output will be meaningless.
 """
 
 from __future__ import annotations
@@ -168,6 +170,34 @@ def _fetch_fred_csv(series_id: str) -> pd.Series:
 def fetch_cpi(series_id: str = "GCPIAG") -> pd.Series:
     """Fetch Australian quarterly CPI index from the RBA's Table G1."""
     return _fetch_rba_csv(RBA_G1_URL, series_id, "%d/%m/%Y")
+
+
+def fetch_aud_usd_fx(start: date) -> pd.Series:
+    """Fetch daily AUD/USD spot (USD per 1 AUD) from Yahoo Finance."""
+    hist = yf.Ticker("AUDUSD=X").history(start=start.isoformat(), auto_adjust=False)
+    if hist.empty:
+        raise RuntimeError("no FX data for AUDUSD=X")
+    hist.index = pd.to_datetime(hist.index).date
+    s = hist["Close"].dropna()
+    if s.empty:
+        raise RuntimeError("AUDUSD=X returned empty close series")
+    return s
+
+
+def convert_cashflows(
+    cashflows: list[tuple[date, float]], fx: pd.Series
+) -> list[tuple[date, float]]:
+    """Multiply each cashflow by the FX rate on its date."""
+    if fx.empty:
+        raise RuntimeError("convert_cashflows: fx series is empty")
+    first = fx.index[0]
+    early = [d for d, _ in cashflows if d < first]
+    if early:
+        raise RuntimeError(
+            f"convert_cashflows: {len(early)} cashflow(s) predate FX series start "
+            f"{first} (earliest: {min(early)})"
+        )
+    return [(d, cf * series_at(fx, d)) for d, cf in cashflows]
 
 
 def fetch_risk_free_yields(country: str, tenor: int) -> pd.Series:
@@ -422,19 +452,30 @@ def main() -> int:
     valuation_date = max(r.last_date for r in results)
 
     nominal = xirr(portfolio_cashflows)
+    nominal_usd: float | None = None
 
-    if args.risk_free:
-        yields = fetch_risk_free_yields(args.risk_free, args.risk_free_tenor)
+    if args.risk_free == "us":
+        earliest = min(d for d, _ in portfolio_cashflows)
+        fx = fetch_aud_usd_fx(earliest)
+        working_cashflows = convert_cashflows(portfolio_cashflows, fx)
+        yields = fetch_risk_free_yields("us", args.risk_free_tenor)
         numeraire = build_rf_index(yields)
-        country = {"au": "AU", "us": "US"}[args.risk_free]
-        deflator_label = f"{country} {args.risk_free_tenor}y govt bond"
+        deflator_label = f"US {args.risk_free_tenor}y govt bond"
+        return_label = f"USD excess return vs {deflator_label}"
+        nominal_usd = xirr(working_cashflows)
+    elif args.risk_free == "au":
+        working_cashflows = portfolio_cashflows
+        yields = fetch_risk_free_yields("au", args.risk_free_tenor)
+        numeraire = build_rf_index(yields)
+        deflator_label = f"AU {args.risk_free_tenor}y govt bond"
         return_label = f"Excess return vs {deflator_label}"
     else:
+        working_cashflows = portfolio_cashflows
         numeraire = fetch_cpi(series_id=args.cpi_series)
         deflator_label = f"AU CPI ({args.cpi_series})"
         return_label = "Real return"
 
-    adjusted = xirr(deflate(portfolio_cashflows, numeraire, valuation_date))
+    adjusted = xirr(deflate(working_cashflows, numeraire, valuation_date))
 
     for r in results:
         print(f"[{r.ticker}]")
@@ -453,7 +494,9 @@ def main() -> int:
     print(f"  Total invested:    {total_invested:,.2f}")
     print(f"  Distributions:     {total_distributions:,.2f}")
     print(f"  Current value:     {total_value:,.2f}")
-    print(f"  Nominal return:    {nominal * 100:.2f}% p.a.")
+    print(f"  Nominal return:    {nominal * 100:.2f}% p.a. (AUD)")
+    if nominal_usd is not None:
+        print(f"  Nominal return:    {nominal_usd * 100:.2f}% p.a. (USD)")
     print(f"  {return_label + ':':<18} {adjusted * 100:.2f}% p.a.")
     return 0
 
