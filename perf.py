@@ -125,7 +125,7 @@ US_BOND_SERIES = {
 }
 
 
-def _fetch_rba_csv(url: str, series_id: str) -> pd.Series:
+def _fetch_rba_csv(url: str, series_id: str, date_format: str) -> pd.Series:
     with urllib.request.urlopen(url, timeout=30) as resp:
         raw = resp.read().decode("utf-8-sig")
     lines = raw.splitlines()
@@ -141,9 +141,14 @@ def _fetch_rba_csv(url: str, series_id: str) -> pd.Series:
             f"(have {list(df.columns)[:6]}...)"
         )
     date_col = df.columns[0]
-    df[date_col] = pd.to_datetime(df[date_col], errors="coerce", format="%d-%b-%Y")
+    df[date_col] = pd.to_datetime(df[date_col], errors="coerce", format=date_format)
     df = df.dropna(subset=[date_col]).set_index(date_col).sort_index()
     s = pd.to_numeric(df[series_id], errors="coerce").dropna()
+    if s.empty:
+        raise RuntimeError(
+            f"series {series_id!r} from {url} parsed to empty "
+            f"(date format {date_format!r} may not match)"
+        )
     s.index = s.index.date
     return s
 
@@ -162,7 +167,7 @@ def _fetch_fred_csv(series_id: str) -> pd.Series:
 
 def fetch_cpi(series_id: str = "GCPIAG") -> pd.Series:
     """Fetch Australian quarterly CPI index from the RBA's Table G1."""
-    return _fetch_rba_csv(RBA_G1_URL, series_id)
+    return _fetch_rba_csv(RBA_G1_URL, series_id, "%d/%m/%Y")
 
 
 def fetch_risk_free_yields(country: str, tenor: int) -> pd.Series:
@@ -173,7 +178,7 @@ def fetch_risk_free_yields(country: str, tenor: int) -> pd.Series:
             raise ValueError(
                 f"AU tenor {tenor}y unsupported; choose from {sorted(AU_BOND_SERIES)}"
             )
-        return _fetch_rba_csv(RBA_F2_URL, AU_BOND_SERIES[tenor])
+        return _fetch_rba_csv(RBA_F2_URL, AU_BOND_SERIES[tenor], "%d-%b-%Y")
     if country == "us":
         if tenor not in US_BOND_SERIES:
             raise ValueError(
